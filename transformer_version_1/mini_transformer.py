@@ -118,7 +118,7 @@ class ResidualConnection(nn.Module):
     def forward(self, x, sublayer):        
         return x + self.dropout(sublayer(self.norm(x)))
 
-class EncoderBlock(nn.MOdule):
+class EncoderBlock(nn.Module):
     def __init__(self, self_attention_block: MultiHeadAttention, feed_forward: FeedForwardLayer, dropout: float):
         super().__init()
         self.self_attention_block = self_attention_block
@@ -159,7 +159,7 @@ class DecoderBlock(nn.Module):
 
 class Decoder(nn.Module):
     def __init__(self, layers: nn.ModuleList):
-        super.__init__()
+        super().__init__()
         self.layers = layers
         self.norm = LayerNormalization()
         
