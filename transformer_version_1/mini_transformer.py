@@ -181,7 +181,17 @@ class ProjectionLayer(nn.Module):
 # Transformer class
 
 class Transformer(nn.Module):
-    def __init__(self, encoder: Encoder, decoder: Decoder, projection: ProjectionLayer, source_embed: InputEmbedding, target_embed: InputEmbedding, source_pos: PositionalEncoding, target_pos: PositionalEncoding):
+
+    def __init__(
+        self,
+        encoder: Encoder,
+        decoder: Decoder,
+        source_embed: InputEmbedding,
+        target_embed: InputEmbedding,
+        source_pos: PositionalEncoding,
+        target_pos: PositionalEncoding,
+        projection: ProjectionLayer,
+    ):
         super().__init__()
         self.encoder = encoder
         self.decoder = decoder
@@ -190,19 +200,19 @@ class Transformer(nn.Module):
         self.source_pos = source_pos
         self.target_pos = target_pos
         self.projection = projection
-        
+
     def encode(self, source, source_mask):
         source = self.source_embed(source)
         source = self.source_pos(source)
-        
+
         return self.encoder(source, source_mask)
-    
+
     def decode(self, encoder_output, source_mask, target, target_mask):
         target = self.target_embed(target)
         target = self.target_pos(target)
-        
+
         return self.decoder(target, encoder_output, source_mask, target_mask)
-    
+
     def project(self, x):
         return self.projection(x)
 

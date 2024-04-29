@@ -34,7 +34,7 @@ def create_tokenizer(config, ds, lang):
     return tokenizer
 
 def get_dataset(config):
-    ds_raw = load_dataset('opus_books', f'{config['lang_src']}+{config['lang_tgt']}', split='train')
+    ds_raw = load_dataset('opus_books', config['lang_src'] + '-' + config['lang_tgt'], split='train')
     
     tokenizer_src = create_tokenizer(config, ds_raw, config['lang_src'])
     tokenizer_tgt = create_tokenizer(config, ds_raw, config['lang_tgt'])
@@ -94,7 +94,7 @@ def training_loop(config):
         optimizer.load_state_dict(state['optimizer'])
         step = state['step']
         
-    loss = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id('[PAD]'), label_smoothing=0.1).to(device)
+    loss_fn = nn.CrossEntropyLoss(ignore_index=tokenizer_src.token_to_id('[PAD]'), label_smoothing=0.1).to(device)
     
     for epoch in tqdm(range(initial_epoch, config['epochs'])):
         model.train()
@@ -111,8 +111,8 @@ def training_loop(config):
             projection_output = model.projection(decoder_output)
             
             label = batch['label'].to(device)
-            loss = loss(projection_output.view(-1, tokenizer_tgt.get_vocab_size()), label.view(-1))
-            batch_iterator.set_postfix({f'loss': f'{loss.item():,2f}'})
+            loss = loss_fn(projection_output.view(-1, tokenizer_tgt.get_vocab_size()), label.view(-1))
+            batch_iterator.set_postfix({f'loss': f'{loss.item():.2f}'})
             
             writer.add_scalar('loss', loss.item(), step)
             writer.flush()
