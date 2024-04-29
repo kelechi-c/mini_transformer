@@ -18,7 +18,7 @@ from mini_transformer import build_transformer
 def get_all_sentences(ds, lang):
     for item in ds:
         yield item['translation'][lang]
-           
+
 def create_tokenizer(config, ds, lang):
     tokenizer_path = Path(config('tokenizer_file').format(lang))
     if not Path.exists(tokenizer_path):
@@ -69,6 +69,54 @@ def build_model(config, vocab_src_len, vocab_tgt_len):
     mini_transformer = build_transformer(vocab_src_len, vocab_tgt_len, config['seq_len'], config['seq_len'], config['d_model'])
     
     return mini_transformer
+
+
+def greedy_decode(model, source, source_mask, tokenizer_src, tokenizer_tgt, max_len, device):
+    sos_idx = tokenizer_tgt.token_to_id('[SOS]')
+    eos_idx = tokenizer_tgt.token_to_id("[EOS]")
+
+    encoder_output = model.encode(source, source_mask)
+    decoder_input = torch.empty(1,1).fill_(sos_idx).type_as(source).to(device)
+    
+    while True:
+        if decoder_input.size(1) == max_len:
+            break
+        
+        decoder_mask = causal_mask(decoder_input.size(1)).type_as(source_mask).to(device)
+        output = model.decode(encoder_output, source_mask, decoder_input, decoder_mask)
+        
+        prob = model.projection(output[:,-1])
+        
+        _, next_word = torch.max(prob, dim=1)
+        decoder_input = torch.cat([
+            decoder_input, torch.empty(1,1).type_as(source).fill_(next_word.item()).to(device)
+        ], dim=1)
+        
+        if next_word == eos_idx:
+            break
+        
+    return decoder_input.squeeze(0)
+    
+
+def validation_run(model, valid_data, tokenizer_src, tokenizer_tgt, max_len, device, print_message, global_state, write, num_examples=2):
+    model.eval()
+    count = 0
+    
+    source_txt = []
+    expected = []
+    predicted = []
+    console_width = 80
+    
+    with torch.no_grad():
+        for batch in valid_data:
+            count  += 1
+            encoder_input = batch['encoder_input'].to(device)
+            encoder_mask = batch['encoder_mask'].to(device)
+
+            assert encoder_input.size(0) == 1, "Batch size must be equal to 1"
+            
+            model_output = greedy_decode(model, encoder_input, encoder_mask, tokenizer_src, tokenizer_tgt, max_len, device)
+            
 
 
 def training_loop(config):
@@ -130,8 +178,8 @@ def training_loop(config):
                 'step': step,
                 'optimizer': optimizer.state_dict()
             }, model_filename)
-            
-            
+
+
 if __name__ == '__main__':
     warnings.filterwarnings("ignore")
     config = get_config()
