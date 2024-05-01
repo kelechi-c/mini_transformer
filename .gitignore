@@ -1,4 +1,3 @@
 .transformer_env
 transformer_version_1/transformer.ipynb
 translation_transformer/__pycache__
-translation_transformer/translation_transformer.pth
