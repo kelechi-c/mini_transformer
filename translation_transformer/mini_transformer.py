@@ -25,14 +25,14 @@ class PositionalEncoding(nn.Module):
         position = torch.arange(0, seq_len, dtype=torch.float).unsqueeze(1)
         div_term = torch.exp(torch.arange(0, d_model, 2).float() * (-math.log(10000.0) / d_model))
         
-        pe[:, 0::2] * torch.sin(position * div_term)
-        pe[:, 1::2] * torch.cos(position * div_term)
+        pe[:, 0::2] = torch.sin(position * div_term)
+        pe[:, 1::2] = torch.cos(position * div_term)
         
         pe = pe.unsqueeze(0)
         self.register_buffer('pe', pe)
         
     def forward(self, x):
-        x = x + (self.pe[:, :x.shape[1], :]).requires_grad(False)
+        x = x + (self.pe[:, :x.shape[1], :]).requires_grad_(False)
         
         return self.dropout(x)
 
@@ -120,7 +120,7 @@ class ResidualConnection(nn.Module):
 
 class EncoderBlock(nn.Module):
     def __init__(self, self_attention_block: MultiHeadAttention, feed_forward: FeedForwardLayer, dropout: float):
-        super().__init()
+        super().__init__()
         self.self_attention_block = self_attention_block
         self.feed_forward_layer = feed_forward
         self.residual_connections = nn.ModuleList([ResidualConnection(dropout) for _ in range(2)])
@@ -133,13 +133,15 @@ class EncoderBlock(nn.Module):
 
 class Encoder(nn.Module):
     def __init__(self, layers: nn.ModuleList):
+        super().__init__()
+
         self.layers = layers
         self.norm = LayerNormalization()
-        
+
     def forward(self, x, mask):
         for layer in self.layers:
             x = layer(x, mask)
-            
+
         return self.norm(x)
 
 
@@ -186,11 +188,11 @@ class Transformer(nn.Module):
         self,
         encoder: Encoder,
         decoder: Decoder,
+        projection: ProjectionLayer,
         source_embed: InputEmbedding,
         target_embed: InputEmbedding,
         source_pos: PositionalEncoding,
-        target_pos: PositionalEncoding,
-        projection: ProjectionLayer,
+        target_pos: PositionalEncoding
     ):
         super().__init__()
         self.encoder = encoder
@@ -217,7 +219,17 @@ class Transformer(nn.Module):
         return self.projection(x)
 
 
-def build_transformer(source_vocab_size, target_vocab_size, source_seq_len, target_seq_len, d_model, nh, n_blocks, d_ff, dropout):
+def build_transformer(
+    source_vocab_size,
+    target_vocab_size,
+    source_seq_len,
+    target_seq_len,
+    d_model,
+    nh=8,
+    n_blocks=6,
+    d_ff=2048,
+    dropout=0.1,
+):
     source_embed = InputEmbedding(d_model, source_vocab_size)
     target_embed = InputEmbedding(d_model, target_vocab_size)
 
@@ -246,13 +258,13 @@ def build_transformer(source_vocab_size, target_vocab_size, source_seq_len, targ
 
     encoder = Encoder(nn.ModuleList(encoder_blocks))
     decoder = Decoder(nn.ModuleList(decoder_blocks))
-    
+
     projection_layer = ProjectionLayer(d_model, target_vocab_size)
-    
-    transformer = Transformer(encoder, decoder, source_embed, target_embed, source_pos, target_pos, projection_layer)
-    
+
+    transformer = Transformer(encoder, decoder,projection_layer, source_embed, target_embed, source_pos, target_pos)
+
     for x in transformer.parameters():
         if x.dim() > 1:
             nn.init.xavier_uniform_(x)
-    
+
     return transformer
